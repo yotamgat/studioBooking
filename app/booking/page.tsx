@@ -26,14 +26,12 @@ export default function BookingPage() {
   const [studios, setStudios] = useState<Studio[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedTime, setSelectedTime] = useState<string>(''); // Store selected time
+  const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedStudio, setSelectedStudio] = useState('');
   const [bookingDetails, setBookingDetails] = useState<any>(null);
-  const [createdBookingId, setCreatedBookingId] = useState<string>('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Studio, 2: Date+Time, 3: Details, 4: Confirm
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/signin?callbackUrl=/booking');
@@ -69,67 +67,85 @@ export default function BookingPage() {
     setStep(3);
   };
 
-  const handleBookingConfirm = async (details: any) => {
-    console.log('פרטי הזמנה:', details);
-    
+  // Step 3 → Step 4: just save details, no DB call yet
+  const handleBookingConfirm = (details: any) => {
+    const [hours, minutes] = details.startTime.split(':').map(Number);
+    const startDateTime = new Date(selectedDate!);
+    startDateTime.setHours(hours, minutes, 0, 0);
+
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setMinutes(endDateTime.getMinutes() + details.duration);
+
+    setBookingDetails({
+      ...details,
+      startDateTime,
+      endDateTime,
+    });
+    setStep(4);
+  };
+
+  // Step 4: create booking in DB then redirect to PeleCard
+  const handlePayment = async () => {
     if (!session?.user?.id) {
       alert('אנא התחבר למערכת');
       router.push('/auth/signin');
       return;
     }
-    
-    try {
-      // Calculate end time
-      const [hours, minutes] = details.startTime.split(':').map(Number);
-      const startDateTime = new Date(selectedDate!);
-      startDateTime.setHours(hours, minutes, 0, 0);
-      
-      const endDateTime = new Date(startDateTime);
-      endDateTime.setMinutes(endDateTime.getMinutes() + details.duration);
 
-      // Create booking with real user ID
-      const response = await fetch('/api/bookings', {
+    setPaymentLoading(true);
+    try {
+      // 1. Create booking with status 'pending'
+      const bookingRes = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studioId: selectedStudio,
-          userId: session.user.id, // Real user ID from session
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-          totalHours: details.duration / 60,
-          pricePerHour: details.price / (details.duration / 60),
-          totalPrice: details.price,
-          participants: details.participants,
-          activityType: details.activityType,
-          isCommercial: details.isCommercial,
+          userId: session.user.id,
+          startTime: bookingDetails.startDateTime.toISOString(),
+          endTime: bookingDetails.endDateTime.toISOString(),
+          totalHours: bookingDetails.duration / 60,
+          pricePerHour: bookingDetails.price / (bookingDetails.duration / 60),
+          totalPrice: bookingDetails.price,
+          participants: bookingDetails.participants,
+          activityType: bookingDetails.activityType,
+          isCommercial: bookingDetails.isCommercial,
           status: 'pending',
           paymentStatus: 'pending',
         }),
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setCreatedBookingId(data.data._id);
-        setBookingDetails({
-          ...details,
-          startDateTime,
-          endDateTime,
-        });
-          setStep(4);
-        }else {
-        alert('שגיאה ביצירת הזמנה: ' + data.error);
+      const bookingData = await bookingRes.json();
+      if (!bookingData.success) {
+        alert('שגיאה ביצירת הזמנה: ' + bookingData.error);
+        setPaymentLoading(false);
+        return;
+      }
+
+      const bookingId = bookingData.data._id;
+
+      // 2. Initialize PeleCard payment
+      const paymentRes = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+
+      const paymentData = await paymentRes.json();
+      if (paymentData.paymentUrl) {
+        window.location.href = paymentData.paymentUrl;
+      } else {
+        alert('שגיאה ביצירת דף תשלום: ' + (paymentData.error || 'נסה שוב'));
+        setPaymentLoading(false);
       }
     } catch (error) {
       console.error('שגיאה:', error);
-      alert('שגיאה ביצירת הזמנה');
+      alert('שגיאה בחיבור לשירות התשלומים');
+      setPaymentLoading(false);
     }
   };
 
   const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
+    if (step > 1) setStep(step - 1);
   };
 
   const selectedStudioData = studios.find(s => s.id === selectedStudio);
@@ -145,9 +161,7 @@ export default function BookingPage() {
     );
   }
 
-  if (!session) {
-    return null; // Will redirect
-  }
+  if (!session) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -166,7 +180,7 @@ export default function BookingPage() {
       <div className="bg-white border-b">
         <div className="container mx-auto p-6">
           <div className="flex items-center justify-between max-w-3xl mx-auto">
-            {['בחר חלל', 'בחר תאריך', 'פרטי הזמנה', 'אישור'].map((label, index) => {
+            {['בחר חלל', 'בחר תאריך', 'פרטי הזמנה', 'תשלום'].map((label, index) => {
               const stepNum = index + 1;
               const isActive = step >= stepNum;
               const isCurrent = step === stepNum;
@@ -178,11 +192,7 @@ export default function BookingPage() {
                       className={`
                         w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg
                         transition-all duration-300
-                        ${
-                          isActive
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        }
+                        ${isActive ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}
                         ${isCurrent ? 'ring-4 ring-purple-200 scale-110' : ''}
                       `}
                     >
@@ -192,10 +202,7 @@ export default function BookingPage() {
                   </div>
                   {index < 3 && (
                     <div
-                      className={`
-                        w-16 h-1 mx-2 transition-all duration-300
-                        ${isActive ? 'bg-purple-600' : 'bg-gray-200'}
-                      `}
+                      className={`w-16 h-1 mx-2 transition-all duration-300 ${isActive ? 'bg-purple-600' : 'bg-gray-200'}`}
                     />
                   )}
                 </div>
@@ -220,10 +227,7 @@ export default function BookingPage() {
                 <h2 className="text-2xl font-bold">בחר תאריך ושעה</h2>
                 <p className="text-sm text-gray-600 mt-1">לחץ על יום כדי לראות שעות פנויות, ואז בחר שעה</p>
               </div>
-              <button
-                onClick={handleBack}
-                className="text-purple-600 hover:text-purple-700 flex items-center gap-2"
-              >
+              <button onClick={handleBack} className="text-purple-600 hover:text-purple-700 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
@@ -246,10 +250,7 @@ export default function BookingPage() {
                 <h2 className="text-2xl font-bold">פרטי ההזמנה</h2>
                 <p className="text-gray-600 mt-1">{selectedStudioData?.name}</p>
               </div>
-              <button
-                onClick={handleBack}
-                className="text-purple-600 hover:text-purple-700 flex items-center gap-2"
-              >
+              <button onClick={handleBack} className="text-purple-600 hover:text-purple-700 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
@@ -267,124 +268,91 @@ export default function BookingPage() {
           </div>
         )}
 
-        {/* Step 4: Confirmation */}
+        {/* Step 4: Summary + Payment */}
         {step === 4 && bookingDetails && (
           <div className="bg-white rounded-lg shadow-md p-8 max-w-2xl mx-auto">
             <div className="text-center mb-6">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold mb-2">ההזמנה נשמרה בהצלחה!</h2>
-              <p className="text-gray-600">כעת יש להשלים את התשלום כדי לאשר את ההזמנה</p>
+              <h2 className="text-2xl font-bold mb-2">סיכום ההזמנה</h2>
+              <p className="text-gray-600">בדוק את הפרטים ולחץ על תשלום כדי לאשר</p>
             </div>
-            
-            <div className="bg-gray-50 rounded-lg p-6 mb-6 text-right space-y-4">
-              <h3 className="font-bold text-lg mb-4 border-b pb-2">סיכום הזמנה</h3>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">חלל:</span>
-                  <span className="font-medium text-right">{selectedStudioData?.name}</span>
-                </div>
-                
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">תאריך:</span>
-                  <span className="font-medium">
-                    {selectedDate?.toLocaleDateString('he-IL', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
 
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">שעות:</span>
-                  <div className="text-right">
-                    <div className="font-medium">
-                      {bookingDetails.startTime} - {bookingDetails.endDateTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      ({bookingDetails.duration} דקות)
-                    </div>
+            <div className="bg-gray-50 rounded-lg p-6 mb-6 text-right space-y-3">
+              <h3 className="font-bold text-lg mb-4 border-b pb-2">פרטי ההזמנה</h3>
+
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">חלל:</span>
+                <span className="font-medium text-right">{selectedStudioData?.name}</span>
+              </div>
+
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">תאריך:</span>
+                <span className="font-medium">
+                  {selectedDate?.toLocaleDateString('he-IL', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                  })}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">שעות:</span>
+                <div className="text-right">
+                  <div className="font-medium">
+                    {bookingDetails.startTime} - {bookingDetails.endDateTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
                   </div>
+                  <div className="text-sm text-gray-500">({bookingDetails.duration} דקות)</div>
                 </div>
+              </div>
 
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">מספר משתתפים:</span>
-                  <span className="font-medium">
-                    {bookingDetails.participants === 1 ? '1 אדם' : 
-                     bookingDetails.participants === 3 ? '2-4 אנשים' :
-                     bookingDetails.participants === 10 ? '5-15 אנשים' :
-                     bookingDetails.participants === 20 ? '16-25 אנשים' :
-                     '26+ אנשים'}
-                  </span>
-                </div>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">משתתפים:</span>
+                <span className="font-medium">
+                  {bookingDetails.participants === 1 ? '1 אדם' :
+                   bookingDetails.participants === 3 ? '2-4 אנשים' :
+                   bookingDetails.participants === 10 ? '5-15 אנשים' :
+                   bookingDetails.participants === 20 ? '16-25 אנשים' : '26+ אנשים'}
+                </span>
+              </div>
 
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">סוג פעילות:</span>
-                  <span className="font-medium">{bookingDetails.activityType}</span>
-                </div>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">סוג פעילות:</span>
+                <span className="font-medium">{bookingDetails.activityType}</span>
+              </div>
 
-                <div className="flex justify-between items-start">
-                  <span className="text-gray-600">סוג שימוש:</span>
-                  <span className="font-medium">
-                    {bookingDetails.isCommercial ? 'מסחרי' : 'לא מסחרי'}
-                  </span>
-                </div>
+              <div className="flex justify-between items-start">
+                <span className="text-gray-600">סוג שימוש:</span>
+                <span className="font-medium">{bookingDetails.isCommercial ? 'מסחרי' : 'לא מסחרי'}</span>
+              </div>
 
-                <div className="border-t pt-3 mt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-900">סה"כ לתשלום:</span>
-                    <span className="text-2xl font-bold text-purple-600">
-                      ₪{bookingDetails.price}
-                    </span>
-                  </div>
+              <div className="border-t pt-3 mt-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-bold text-gray-900">סה"כ לתשלום:</span>
+                  <span className="text-2xl font-bold text-purple-600">₪{bookingDetails.price}</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
               <button
-                  disabled={paymentLoading}
-                  onClick={async () => {
-                  setPaymentLoading(true);
-                try {
-                  const res = await fetch('/api/payment/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bookingId: createdBookingId }),
-                  });
-                  const data = await res.json();
-                  if (data.paymentUrl) {
-                    window.location.href = data.paymentUrl;
-                  } else {
-                    alert('שגיאה ביצירת דף תשלום: ' + (data.error || 'נסה שוב'));
-                  }
-                } catch (error) {
-                  alert('שגיאה בחיבור לשירות התשלומים');
-                } finally {
-                  setPaymentLoading(false);
-                }
-              }}
-                className="w-full bg-green-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-green-700 transition shadow-lg"
+                onClick={handlePayment}
+                disabled={paymentLoading}
+                className="w-full bg-purple-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {paymentLoading ? '⏳ מתחבר לדף תשלום...' : '💳 מעבר לתשלום'}              </button>
-              
+                {paymentLoading ? '⏳ מתחבר לדף תשלום...' : '💳 מעבר לתשלום'}
+              </button>
+
               <button
-                onClick={() => window.location.href = '/booking'}
+                onClick={handleBack}
+                disabled={paymentLoading}
                 className="w-full bg-gray-200 text-gray-700 px-8 py-3 rounded-lg font-medium hover:bg-gray-300 transition"
               >
-                הזמנה נוספת
+                חזור לעריכת פרטים
               </button>
             </div>
-
-            <p className="text-xs text-gray-500 text-center mt-4">
-              ההזמנה תישמר למשך 15 דקות. יש להשלים את התשלום כדי לאשר.
-            </p>
           </div>
         )}
       </main>

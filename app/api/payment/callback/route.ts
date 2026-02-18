@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Booking from '@/models/Booking';
 import { verifyPayment } from '@/lib/pelecard';
+import Studio from '@/models/Studio';
+import User from '@/models/User';
+import { sendBookingConfirmationEmail } from '@/lib/email';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -56,6 +59,35 @@ export async function GET(request: NextRequest) {
     booking.paymentTransactionId = pelecardTransactionId || '';
     booking.paidAt = new Date();
     await booking.save();
+
+    // Send confirmation email after successful payment
+    try {
+      const [studioDoc, userDoc] = await Promise.all([
+        Studio.findById(booking.studioId),
+        User.findById(booking.userId),
+      ]);
+
+      if (studioDoc && userDoc && userDoc.email) {
+        await sendBookingConfirmationEmail({
+          customerName: userDoc.name,
+          customerEmail: userDoc.email,
+          studioName: studioDoc.name,
+          studioAddress: studioDoc.address || 'כתובת תינתן במייל נפרד',
+          date: new Date(booking.startTime).toLocaleDateString('he-IL', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          }),
+          startTime: new Date(booking.startTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+          endTime: new Date(booking.endTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+          duration: `${booking.totalHours} שעות`,
+          participants: booking.participants,
+          activityType: booking.activityType,
+          totalPrice: booking.totalPrice,
+          bookingId: booking._id.toString(),
+        });
+      }
+        } catch (emailError) {
+          console.error('Error sending confirmation email:', emailError);
+        }
 
     return NextResponse.redirect(
       `${baseUrl}/payment/success?bookingId=${userKey}`

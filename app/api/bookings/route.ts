@@ -109,51 +109,7 @@ export async function POST(request: NextRequest) {
       paymentStatus: 'pending',
     });
 
-    // Send confirmation email
-    try {
-      const [studio, user] = await Promise.all([
-        Studio.findById(studioId),
-        User.findById(userId),
-      ]);
-
-      if (studio && user && user.email) {
-        const participantsLabel = 
-          participants === 1 ? '1 אדם' :
-          participants === 3 ? '2-4 אנשים' :
-          participants === 10 ? '5-15 אנשים' :
-          participants === 20 ? '16-25 אנשים' :
-          '26+ אנשים';
-
-        await sendBookingConfirmationEmail({
-          customerName: user.name,
-          customerEmail: user.email,
-          studioName: studio.name,
-          studioAddress: studio.address || 'כתובת תינתן במייל נפרד',
-          date: start.toLocaleDateString('he-IL', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-          startTime: start.toLocaleTimeString('he-IL', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          endTime: end.toLocaleTimeString('he-IL', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          duration: `${totalHours} שעות`,
-          participants: participants,
-          activityType,
-          totalPrice,
-          bookingId: booking._id.toString(),
-        });
-      }
-    } catch (emailError) {
-      // Log email error but don't fail the booking
-      console.error('Error sending confirmation email:', emailError);
-    }
+    
 
     return NextResponse.json(
       {
