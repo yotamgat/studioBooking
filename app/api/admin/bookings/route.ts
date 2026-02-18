@@ -47,12 +47,12 @@ export async function GET(request: NextRequest) {
       User.find({ _id: { $in: userIds } }).lean(),
     ]);
 
-    const studioMap = Object.fromEntries(studios.map(s => [s._id.toString(), s]));
-    const userMap = Object.fromEntries(users.map(u => [u._id.toString(), u]));
+    const studioMap = Object.fromEntries(studios.map(s => [(s._id as any).toString(), s]));
+const userMap = Object.fromEntries(users.map(u => [(u._id as any).toString(), u]));
 
     const enrichedBookings = bookings.map(booking => ({
       ...booking,
-      _id: booking._id.toString(),
+      _id: (booking._id as any).toString(),
       studioId: booking.studioId.toString(),
       userId: booking.userId?.toString(),
       createdAt: booking.createdAt?.toISOString(),
