@@ -25,7 +25,6 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('הסיסמאות אינן תואמות');
       return;
@@ -58,7 +57,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // Auto sign in after registration
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
@@ -66,7 +64,6 @@ export default function RegisterPage() {
       });
 
       if (result?.error) {
-        // Registration succeeded but auto-login failed
         router.push('/auth/signin?registered=true');
       } else {
         router.push('/booking');
@@ -77,6 +74,8 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-gray-900 bg-white";
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -105,7 +104,8 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                dir="rtl"
+                className={inputClass}
                 placeholder="שם מלא"
               />
             </div>
@@ -121,7 +121,8 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                dir="ltr"
+                className={inputClass}
                 placeholder="example@email.com"
               />
             </div>
@@ -136,7 +137,8 @@ export default function RegisterPage() {
                 type="tel"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                dir="ltr"
+                className={inputClass}
                 placeholder="050-1234567"
               />
             </div>
@@ -152,7 +154,8 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                dir="ltr"
+                className={inputClass}
                 placeholder="לפחות 6 תווים"
               />
             </div>
@@ -168,7 +171,8 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                dir="ltr"
+                className={inputClass}
                 placeholder="הזן סיסמה שוב"
               />
             </div>
