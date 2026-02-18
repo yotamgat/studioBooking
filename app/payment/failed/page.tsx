@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const errorMessages: Record<string, string> = {
@@ -7,9 +8,10 @@ const errorMessages: Record<string, string> = {
   verification_failed: 'לא ניתן היה לאמת את התשלום.',
   booking_not_found: 'ההזמנה לא נמצאה במערכת.',
   server_error: 'אירעה שגיאה בשרת.',
+  payment_declined: 'הכרטיס סורב על ידי חברת האשראי.',
 };
 
-export default function PaymentFailedPage() {
+function PaymentFailedContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const reason = searchParams.get('reason') || 'server_error';
@@ -21,9 +23,7 @@ export default function PaymentFailedPage() {
         <div className="text-6xl mb-4">❌</div>
         <h1 className="text-2xl font-bold text-gray-800 mb-2">התשלום נכשל</h1>
         <p className="text-gray-500 mb-6">{errorMessage}</p>
-        <p className="text-sm text-gray-400 mb-6">
-          לא חויבת. ניתן לנסות שוב או לפנות אלינו לעזרה.
-        </p>
+        <p className="text-sm text-gray-400 mb-6">לא חויבת. ניתן לנסות שוב או לפנות אלינו לעזרה.</p>
         <button
           onClick={() => router.back()}
           className="w-full bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition mb-3"
@@ -38,5 +38,13 @@ export default function PaymentFailedPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function PaymentFailedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" /></div>}>
+      <PaymentFailedContent />
+    </Suspense>
   );
 }

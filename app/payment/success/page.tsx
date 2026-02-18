@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 interface BookingDetails {
@@ -11,7 +11,7 @@ interface BookingDetails {
   date: string;
 }
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const bookingId = searchParams.get('bookingId');
@@ -20,23 +20,15 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     if (!bookingId) return;
-
     const fetchBooking = async () => {
       try {
         const res = await fetch(`/api/bookings/${bookingId}`);
         const data = await res.json();
-
         setBooking({
           studioName: data.studioId?.name || 'סטודיו',
           date: new Date(data.startTime).toLocaleDateString('he-IL'),
-          startTime: new Date(data.startTime).toLocaleTimeString('he-IL', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          endTime: new Date(data.endTime).toLocaleTimeString('he-IL', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          startTime: new Date(data.startTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+          endTime: new Date(data.endTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
           totalPrice: data.totalPrice,
         });
       } catch (err) {
@@ -45,18 +37,15 @@ export default function PaymentSuccessPage() {
         setLoading(false);
       }
     };
-
     fetchBooking();
   }, [bookingId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      {/* Modal */}
       <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md w-full text-center">
         <div className="text-6xl mb-4">✅</div>
         <h1 className="text-2xl font-bold text-gray-800 mb-2">התשלום בוצע בהצלחה!</h1>
         <p className="text-gray-500 mb-6">ההזמנה שלך אושרה ואימייל אישור נשלח אליך.</p>
-
         {loading ? (
           <div className="text-gray-400 text-sm mb-6">טוען פרטי הזמנה...</div>
         ) : booking ? (
@@ -79,7 +68,6 @@ export default function PaymentSuccessPage() {
             </div>
           </div>
         ) : null}
-
         <button
           onClick={() => router.push('/booking')}
           className="w-full bg-black text-white py-3 rounded-xl hover:bg-gray-800 transition"
@@ -88,5 +76,13 @@ export default function PaymentSuccessPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" /></div>}>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
