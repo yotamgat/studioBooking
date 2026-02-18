@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
             minute: '2-digit',
           }),
           duration: `${totalHours} שעות`,
-          participants: participantsLabel,
+          participants: participants,
           activityType,
           totalPrice,
           bookingId: booking._id.toString(),

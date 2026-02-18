@@ -28,7 +28,9 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>(''); // Store selected time
   const [selectedStudio, setSelectedStudio] = useState('');
-  const [bookingDetails, setBookingDetails] = useState<any>(null); // Store full booking details
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [createdBookingId, setCreatedBookingId] = useState<string>('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Studio, 2: Date+Time, 3: Details, 4: Confirm
 
   // Redirect to login if not authenticated
@@ -108,14 +110,14 @@ export default function BookingPage() {
       const data = await response.json();
       
       if (data.success) {
-        // Save full booking details for confirmation page
+        setCreatedBookingId(data.data._id);
         setBookingDetails({
           ...details,
           startDateTime,
           endDateTime,
         });
-        setStep(4);
-      } else {
+          setStep(4);
+        }else {
         alert('שגיאה ביצירת הזמנה: ' + data.error);
       }
     } catch (error) {
@@ -347,14 +349,30 @@ export default function BookingPage() {
 
             <div className="space-y-3">
               <button
-                onClick={() => {
-                  // TODO: מעבר לסליקה - כאן נוסיף את הקישור לטרנזילה/סליקה
-                  alert('כאן יתווסף קישור לסליקה');
-                }}
+                  disabled={paymentLoading}
+                  onClick={async () => {
+                  setPaymentLoading(true);
+                try {
+                  const res = await fetch('/api/payment/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookingId: createdBookingId }),
+                  });
+                  const data = await res.json();
+                  if (data.paymentUrl) {
+                    window.location.href = data.paymentUrl;
+                  } else {
+                    alert('שגיאה ביצירת דף תשלום: ' + (data.error || 'נסה שוב'));
+                  }
+                } catch (error) {
+                  alert('שגיאה בחיבור לשירות התשלומים');
+                } finally {
+                  setPaymentLoading(false);
+                }
+              }}
                 className="w-full bg-green-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-green-700 transition shadow-lg"
               >
-                💳 מעבר לתשלום
-              </button>
+                {paymentLoading ? '⏳ מתחבר לדף תשלום...' : '💳 מעבר לתשלום'}              </button>
               
               <button
                 onClick={() => window.location.href = '/booking'}

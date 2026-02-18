@@ -14,7 +14,8 @@ export interface IBooking {
   isCommercial: boolean;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   paymentStatus: 'pending' | 'paid' | 'refunded';
-  paymentIntentId?: string;
+  paymentTransactionId?: string;
+  paidAt?: Date;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -79,8 +80,11 @@ const BookingSchema = new Schema<IBooking>(
       enum: ['pending', 'paid', 'refunded'],
       default: 'pending',
     },
-    paymentIntentId: {
+    paymentTransactionId: {
       type: String,
+    },
+    paidAt: {
+      type: Date,
     },
     notes: {
       type: String,
