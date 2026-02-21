@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const bookings = await Booking.find({
       startTime: { $lt: dayEnd },
       endTime: { $gt: dayStart },
-      status: { $ne: 'cancelled' },
+      status: 'confirmed',
     }).lean();
 
     // Get user details for all bookings

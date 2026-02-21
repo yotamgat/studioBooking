@@ -73,13 +73,8 @@ export async function POST(request: NextRequest) {
     // Check for overlapping bookings
     const overlapping = await Booking.findOne({
       studioId,
-      status: { $ne: 'cancelled' },
-      $or: [
-        {
-          startTime: { $lt: end },
-          endTime: { $gt: start },
-        },
-      ],
+      status: 'confirmed',
+      $or: [{ startTime: { $lt: end }, endTime: { $gt: start } }],
     });
 
     if (overlapping) {
