@@ -8,19 +8,20 @@ import Studio from '@/models/Studio';
 import User from '@/models/User';
 import { sendBookingConfirmationEmail } from '@/lib/email';
 
+const IL_TZ = 'Asia/Jerusalem';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   const pelecardStatusCode = searchParams.get('PelecardStatusCode');
   const confirmationKey = searchParams.get('ConfirmationKey');
-  const userKey = searchParams.get('UserKey'); // this is our pendingBookingId
+  const userKey = searchParams.get('UserKey');
   const pelecardTransactionId = searchParams.get('PelecardTransactionId');
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
   if (pelecardStatusCode !== '000') {
     console.error('PeleCard payment failed with status:', pelecardStatusCode);
-    // Clean up pending booking
     if (userKey) {
       try {
         await connectDB();
@@ -39,14 +40,12 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    // Get pending booking details
     const pending = await PendingBooking.findById(userKey);
     if (!pending) {
       console.error('Pending booking not found:', userKey);
       return NextResponse.redirect(`${baseUrl}/payment/failed?reason=booking_not_found`);
     }
 
-    // Validate payment with PeleCard
     const isValid = await verifyPayment({
       confirmationKey,
       userKey,
@@ -58,7 +57,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/payment/failed?reason=verification_failed`);
     }
 
-    // Check one more time for overlaps (race condition protection)
     const overlapping = await Booking.findOne({
       studioId: pending.studioId,
       status: 'confirmed',
@@ -70,7 +68,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/payment/failed?reason=slot_taken`);
     }
 
-    // Create the real confirmed booking
     const booking = await Booking.create({
       studioId: pending.studioId,
       userId: pending.userId,
@@ -89,10 +86,8 @@ export async function GET(request: NextRequest) {
       paidAt: new Date(),
     });
 
-    // Delete the pending booking
     await PendingBooking.findByIdAndDelete(userKey);
 
-    // Send confirmation email
     try {
       const [studioDoc, userDoc] = await Promise.all([
         Studio.findById(booking.studioId),
@@ -107,9 +102,16 @@ export async function GET(request: NextRequest) {
           studioAddress: studioDoc.address || 'כתובת תינתן במייל נפרד',
           date: new Date(booking.startTime).toLocaleDateString('he-IL', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            timeZone: IL_TZ,
           }),
-          startTime: new Date(booking.startTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
-          endTime: new Date(booking.endTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+          startTime: new Date(booking.startTime).toLocaleTimeString('he-IL', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: IL_TZ,
+          }),
+          endTime: new Date(booking.endTime).toLocaleTimeString('he-IL', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: IL_TZ,
+          }),
           duration: `${booking.totalHours} שעות`,
           participants: booking.participants,
           activityType: booking.activityType,
