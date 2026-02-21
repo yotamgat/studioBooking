@@ -38,7 +38,7 @@ export default function ImprovedCalendar({ studioId, onTimeSelect, selectedDate 
       const schedulePromises = weekDays.map(async (date) => {
         try {
           const response = await fetch(
-            `/api/bookings/available-slots?studioId=${studioId}&date=${date.toISOString()}`
+            `/api/bookings/available-slots?studioId=${studioId}&date=${format(date, 'yyyy-MM-dd')}`
           );
           
           if (response.ok) {
