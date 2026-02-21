@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dateOnly = dateStr.split('T')[0]; // "2026-02-22"
+    // Use local date interpretation
+    const dateOnly = new Date(dateStr).toLocaleDateString('en-CA');
     const requestedStart = new Date(`${dateOnly}T${startTimeStr}:00`);
 
     const requestedEnd = new Date(requestedStart);

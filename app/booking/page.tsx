@@ -69,9 +69,9 @@ export default function BookingPage() {
 
   const handleBookingConfirm = (details: any) => {
     const [hours, minutes] = details.startTime.split(':').map(Number);
-    // After - use the date string directly to avoid timezone conversion
-    const dateStr = selectedDate!.toISOString().split('T')[0]; // "2026-02-22"
-    const startDateTime = new Date(`${dateStr}T${details.startTime}:00`); // local time
+    // After - force Israel timezone offset (+2 or +3)
+    const dateStr = selectedDate!.toLocaleDateString('en-CA'); // gives "2026-02-22" in local time
+    const startDateTime = new Date(`${dateStr}T${details.startTime}:00`);
 
     const endDateTime = new Date(startDateTime);
     endDateTime.setMinutes(endDateTime.getMinutes() + details.duration);
