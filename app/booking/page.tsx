@@ -69,8 +69,9 @@ export default function BookingPage() {
 
   const handleBookingConfirm = (details: any) => {
     const [hours, minutes] = details.startTime.split(':').map(Number);
-    const startDateTime = new Date(selectedDate!);
-    startDateTime.setHours(hours, minutes, 0, 0);
+    // After - use the date string directly to avoid timezone conversion
+    const dateStr = selectedDate!.toISOString().split('T')[0]; // "2026-02-22"
+    const startDateTime = new Date(`${dateStr}T${details.startTime}:00`); // local time
 
     const endDateTime = new Date(startDateTime);
     endDateTime.setMinutes(endDateTime.getMinutes() + details.duration);

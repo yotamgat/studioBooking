@@ -23,12 +23,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const date = new Date(dateStr);
-    const [hours, minutes] = startTimeStr.split(':').map(Number);
-    
-    const requestedStart = new Date(date);
-    requestedStart.setHours(hours, minutes, 0, 0);
-    
+    const dateOnly = dateStr.split('T')[0]; // "2026-02-22"
+    const requestedStart = new Date(`${dateOnly}T${startTimeStr}:00`);
+
     const requestedEnd = new Date(requestedStart);
     requestedEnd.setMinutes(requestedEnd.getMinutes() + duration);
 
